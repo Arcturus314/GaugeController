@@ -4,18 +4,16 @@
  * Simple vacuum gauge controller using the SSR controller PCB
  */
 
-#include "Arduino.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #include "gaugepinout.h"
-//#include "math.h"
+#include "math.h"
 
 #define INTERLOCK_THRESHOLD_PRESSURE 1e-6 // interlock HIGH above this threshold (mbar)
 #define GAUGE_ID_RESISTANCE 1e5
 #define ALLOWED_ID_VARIANCE 10 // ADC increments, so steps of 5mV
 
-
-Adafruit_SSD1306 display(128, 64, &Wire);
+Adafruit_SSD1306 display = Adafruit_SSD1306(128, 64, &Wire);
 
 bool poweren = false;
 bool hvstatus = false;
@@ -51,8 +49,47 @@ float transform(float involtage, int units) {
     return pressure;
 }
 
+void setup() {
+    Serial.begin(9600);
+    Serial.println("MBE Vacuum Gauge Controller V0.1");
+
+    Serial.println("Initializing IO");
+
+    pinMode(ui.selSw, INPUT);
+    pinMode(ui.nxtSw, INPUT);
+    pinMode(ui.interlockLED, OUTPUT);
+
+    pinMode(gauge.vccen, OUTPUT);
+    pinMode(gauge.hven, OUTPUT);
+    pinMode(gauge.nhven, OUTPUT);
+    // gauge.status: analog input
+    // gauge.idAn: analog input
+    // gauge.signal: analog input
+
+    pinMode(output.relay, OUTPUT);
+
+    // basic initialization
+    digitalWrite(gauge.vccen, LOW);
+    digitalWrite(gauge.hven, LOW);
+    digitalWrite(gauge.nhven, HIGH);
+    digitalWrite(ui.gaugePowerLED, LOW);
+
+    display.display();
+    delay(100);
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0,0);
+    display.println("FALSON GROUP");
+    display.println("CCPG-L2-6 INTERFACE");
+    display.display();
+
+    delay(1000);
+
+}
+
 bool checkGaugeID() {
-    Serial.println(F("checking gauge ID"));
     // returns true if gauge identification correct, 0 otherwise
 
     int expectedVoltage = (int) ( (float) GAUGE_ID_RESISTANCE / ( (float) GAUGE_ID_RESISTANCE + 1e5) * 1024 );
@@ -64,7 +101,6 @@ bool checkGaugeID() {
 }
 
 bool gaugePowerOn() {
-    Serial.println(F("enabling gauge"));
     // Turns on gauge with identification check
     // 1. Checks identification. If correct, proceeds
     // 2. enables supply power, waits 100ms
@@ -86,7 +122,6 @@ bool gaugePowerOn() {
 }
 
 void gaugePowerOff() {
-    Serial.println(F("disabling gauge"));
     // gauge power off, printing user interface message
     // waits for user to power on gauge
     digitalWrite(gauge.hven, LOW);
@@ -98,44 +133,33 @@ void gaugePowerOff() {
 }
 
 void gaugePowerOnUI() {
-    Serial.println(F("powering on with UI"));
     // gauge power on through the user interface
     display.clearDisplay();
-    display.setTextSize(2);
     display.setCursor(0,0);
-    display.println(F("Press SEL to\ninitialize\ngauge"));
-    display.setTextSize(1);
-    display.display();
+    display.println("Press SEL to");
+    display.println("initialize gauge");
 
     while (digitalRead(ui.selSw));
-    delay(100);
 
     bool powerOnStatus = gaugePowerOn();
 
-    display.setTextSize(2);
-
     while (!powerOnStatus) {
         display.clearDisplay();
-        display.setCursor(0,0);
-        display.println(F("Gauge init\nfailed"));
-        display.println(F("Press SEL to retry"));
+        display.println("Gauge init failed");
+        display.println("Press SEL to retry");
         while (digitalRead(ui.selSw));
         powerOnStatus = gaugePowerOn();
         display.display();
     }
-    delay(100);
 
     display.clearDisplay();
-    display.setCursor(0,0);
-    display.println(F("Gauge\ninit\ncomplete"));
+    display.println("Gauge initialized");
     display.display();
-    display.setTextSize(1);
     delay(1000);
 }
 
 
 int readGauge() {
-    Serial.println(F("reading gauge"));
     // returns gauge output, reads status and updates global variables
     // checks identification, turns off gauge if identification incorrect
 
@@ -144,17 +168,14 @@ int readGauge() {
         gaugePowerOff();
         display.clearDisplay();
         display.setCursor(0,0);
-        display.setTextSize(2);
-        display.println(F("GAUGE ERR\n"));
-        display.println(F("Press SEL to reset"));
-        display.setTextSize(1);
-        display.display();
+        display.println("Gauge disconnected");
+        display.println("Press SEL to reset");
         while (digitalRead(ui.selSw));
         gaugePowerOnUI();
     }
 
     // checking high voltage
-    if (analogRead(gauge.status) > 500) hvstatus = true;
+    if (digitalRead(gauge.status)) hvstatus = true;
     else hvstatus = false;
 
     // sampling and returning
@@ -162,79 +183,22 @@ int readGauge() {
 }
 
 void displayInfo() {
-    Serial.println(F("displaying gauge info"));
     // display enabled channels, expected sensor, and interlock threshold voltage
     display.clearDisplay();
-    display.setTextSize(2);
     display.setCursor(0,0);
-    //display.println(F("CCPG-L2-6"));
-    display.print(F("ILK(mbar):"));
-    char threshStr[7];
-    dtostre(INTERLOCK_THRESHOLD_PRESSURE, threshStr, 1, 0);
-    display.println(threshStr);
-    display.print(F("PWR: "));
+    display.println("CCPG-L2-6");
+    display.print("THRESH (mbar): ");
+    display.println(INTERLOCK_THRESHOLD_PRESSURE);
+    display.print("PWR: ");
     display.println(poweren);
-    display.print(F("HV: "));
+    display.print("HV: ");
     display.println(hvstatus);
     display.display();
-    while (!digitalRead(ui.nxtSw));
     delay(2000);
 }
 
 int invertDisplayCounter = 0;
 bool invertDisplayVal = false;
-
-void setup() {
-    Serial.begin(9600);
-    Serial.println(F("MBE Vacuum Gauge Controller V0.1"));
-
-    Serial.println(F("Initializing IO"));
-
-    pinMode(ui.selSw, INPUT);
-    pinMode(ui.nxtSw, INPUT);
-    pinMode(ui.interlockLED, OUTPUT);
-
-    pinMode(gauge.vccen, OUTPUT);
-    pinMode(gauge.hven, OUTPUT);
-    pinMode(gauge.nhven, OUTPUT);
-    // gauge.status: analog input
-    // gauge.idAn: analog input
-    // gauge.signal: analog input
-
-    pinMode(output.relay, OUTPUT);
-
-    // basic initialization
-    digitalWrite(gauge.vccen, LOW);
-    digitalWrite(gauge.hven, LOW);
-    digitalWrite(gauge.nhven, HIGH);
-    digitalWrite(ui.gaugePowerLED, LOW);
-
-    Serial.println(F("displaying..."));
-
-    while(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-        Serial.println(F("display init failed"));
-        delay(500);
-    }
-
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.setTextSize(2);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0,0);
-    display.println(F("FALSON LAB"));
-    display.println(F("CCPG-L2-6 INTERFACE"));
-    display.display();
-    display.setTextSize(1);
-
-    Serial.println(F("done displaying..."));
-
-    delay(5000);
-
-    gaugePowerOnUI();
-
-
-
-}
 
 
 void loop() {
@@ -244,20 +208,18 @@ void loop() {
     float pressure_mbar = transform(signalVoltage, 0);
 
     display.clearDisplay();
-    display.setCursor(1,1);
-    display.setTextSize(3);
-    char pressureUnitsStr[7];
-    dtostre(pressure_units, pressureUnitsStr, 1, 0);
-    display.println(pressureUnitsStr);
+    display.setTextSize(5);
+    display.println(pressure_units);
+
     switch(selUnits) {
         case 0: // mbar
-            display.println(F("mbar"));
+            display.println("mbar");
             break;
         case 1: // torr
-            display.println(F("torr"));
+            display.println("torr");
             break;
         case 2: // Pa
-            display.println(F("Pa"));
+            display.println("Pa");
             break;
     }
     display.display();
@@ -278,15 +240,14 @@ void loop() {
     // unit selection
     if (!digitalRead(ui.selSw)) {
         selUnits += 1;
-        if (selUnits == 3) selUnits = 0;
+        if (selUnits == 4) selUnits = 0;
     }
 
     // info screen
     if (!digitalRead(ui.nxtSw)) displayInfo();
 
     // inverting OLED to prevent burn-in
-    delay(300);
-
+    delay(100);
     invertDisplayCounter += 1;
 
     if (invertDisplayCounter % 100 == 0) {

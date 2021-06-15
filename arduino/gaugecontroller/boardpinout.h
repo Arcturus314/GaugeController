@@ -7,13 +7,12 @@
 #ifndef boardpinout_h
 #define boardpinout_h
 
-#include "Arduino.h"
 
 // note: I2C interface not included in this pinout
 
 struct generalio_struct {
     const int selSw = 12;
-    const int nxtSw = 13;
+    const int nxtSw = 12;
 } generalio;
 
 struct ch0_struct {
