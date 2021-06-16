@@ -73,7 +73,7 @@ bool gaugePowerOn() {
 
     if (!checkGaugeID()) return false;
 
-    digitalWrite(gauge.vccen, HIGH);
+    digitalWrite(gauge.vccen, LOW);
     poweren = true;
     digitalWrite(ui.gaugePowerLED, HIGH);
     delay(100);
@@ -92,7 +92,7 @@ void gaugePowerOff() {
     digitalWrite(gauge.hven, LOW);
     digitalWrite(gauge.nhven, LOW);
     delay(100);
-    digitalWrite(gauge.vccen, LOW);
+    digitalWrite(gauge.vccen, HIGH);
     poweren = false;
     digitalWrite(ui.gaugePowerLED, LOW);
 }
@@ -204,7 +204,7 @@ void setup() {
     pinMode(output.relay, OUTPUT);
 
     // basic initialization
-    digitalWrite(gauge.vccen, LOW);
+    digitalWrite(gauge.vccen, HIGH); // this is active LOW
     digitalWrite(gauge.hven, LOW);
     digitalWrite(gauge.nhven, HIGH);
     digitalWrite(ui.gaugePowerLED, LOW);
@@ -248,7 +248,8 @@ void loop() {
     display.setTextSize(3);
     char pressureUnitsStr[7];
     dtostre(pressure_units, pressureUnitsStr, 1, 0);
-    display.println(pressureUnitsStr);
+    display.print(pressureUnitsStr);
+    display.setCursor(30,30);
     switch(selUnits) {
         case 0: // mbar
             display.println(F("mbar"));
