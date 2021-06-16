@@ -52,7 +52,6 @@ float transform(float involtage, int units) {
 }
 
 bool checkGaugeID() {
-    Serial.println(F("checking gauge ID"));
     // returns true if gauge identification correct, 0 otherwise
 
     int expectedVoltage = (int) ( (float) GAUGE_ID_RESISTANCE / ( (float) GAUGE_ID_RESISTANCE + 1e5) * 1024 );
@@ -64,7 +63,6 @@ bool checkGaugeID() {
 }
 
 bool gaugePowerOn() {
-    Serial.println(F("enabling gauge"));
     // Turns on gauge with identification check
     // 1. Checks identification. If correct, proceeds
     // 2. enables supply power, waits 100ms
@@ -86,7 +84,6 @@ bool gaugePowerOn() {
 }
 
 void gaugePowerOff() {
-    Serial.println(F("disabling gauge"));
     // gauge power off, printing user interface message
     // waits for user to power on gauge
     digitalWrite(gauge.hven, LOW);
@@ -98,7 +95,6 @@ void gaugePowerOff() {
 }
 
 void gaugePowerOnUI() {
-    Serial.println(F("powering on with UI"));
     // gauge power on through the user interface
     display.clearDisplay();
     display.setTextSize(2);
@@ -135,13 +131,13 @@ void gaugePowerOnUI() {
 
 
 int readGauge() {
-    Serial.println(F("reading gauge"));
     // returns gauge output, reads status and updates global variables
     // checks identification, turns off gauge if identification incorrect
 
     // checking identification
     if (!checkGaugeID()) {
         gaugePowerOff();
+        digitalWrite(output.relay, HIGH);
         display.clearDisplay();
         display.setCursor(0,0);
         display.setTextSize(2);
@@ -162,7 +158,6 @@ int readGauge() {
 }
 
 void displayInfo() {
-    Serial.println(F("displaying gauge info"));
     // display enabled channels, expected sensor, and interlock threshold voltage
     display.clearDisplay();
     display.setTextSize(2);
@@ -208,8 +203,8 @@ void setup() {
     digitalWrite(gauge.hven, LOW);
     digitalWrite(gauge.nhven, HIGH);
     digitalWrite(ui.gaugePowerLED, LOW);
+    digitalWrite(output.relay, HIGH);
 
-    Serial.println(F("displaying..."));
 
     while(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         Serial.println(F("display init failed"));
@@ -226,7 +221,7 @@ void setup() {
     display.display();
     display.setTextSize(1);
 
-    Serial.println(F("done displaying..."));
+    Serial.println(F("Init complete"));
 
     delay(5000);
 
@@ -240,6 +235,9 @@ void setup() {
 void loop() {
 
     float signalVoltage = readGauge();
+
+    Serial.println(signalVoltage * 5.0 / 1023);
+
     float pressure_units = transform(signalVoltage, selUnits); // in user-selected units
     float pressure_mbar = transform(signalVoltage, 0);
 
@@ -250,6 +248,9 @@ void loop() {
     dtostre(pressure_units, pressureUnitsStr, 1, 0);
     display.print(pressureUnitsStr);
     display.setCursor(30,30);
+
+    // Serial.println(pressureUnitsStr);
+
     switch(selUnits) {
         case 0: // mbar
             display.println(F("mbar"));
@@ -264,14 +265,14 @@ void loop() {
     display.display();
     display.setTextSize(1);
 
-    if (pressure_mbar > INTERLOCK_THRESHOLD_PRESSURE) { // Exceeded threshold
-        digitalWrite(ch0.outDriver, LOW); // turning off interlock
-        digitalWrite(ch0.outPin, LOW); // front panel notification LED
+    if (pressure_mbar > INTERLOCK_THRESHOLD_PRESSURE && poweren == true) { // Exceeded threshold
+        digitalWrite(output.relay, HIGH); // turning off interlock
+        digitalWrite(ui.interlockLED, LOW); // front panel notification LED
     }
 
     else { // normal safe conditions
-        digitalWrite(ch0.outDriver, HIGH); // turning on interlock
-        digitalWrite(ch0.outPin, HIGH); // front panel notification LED
+        digitalWrite(output.relay, LOW); // turning on interlock
+        digitalWrite(ui.interlockLED, HIGH); // front panel notification LED
     }
 
     // other UI code
