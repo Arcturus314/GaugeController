@@ -8,7 +8,8 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #include "gaugepinout.h"
-//#include "math.h"
+#include "Adafruit_LEDBackpack.h"
+#include "math.h"
 
 #define INTERLOCK_THRESHOLD_PRESSURE 1e-6 // interlock HIGH above this threshold (mbar)
 #define GAUGE_ID_RESISTANCE 1e5
@@ -16,6 +17,7 @@
 
 
 Adafruit_SSD1306 display(128, 64, &Wire);
+Adafruit_7segment matrix = Adafruit_7segment();
 
 bool poweren = false;
 bool hvstatus = false;
@@ -101,6 +103,8 @@ void gaugePowerOnUI() {
     display.setCursor(0,0);
     display.println(F("Press SEL to\ninitialize\ngauge"));
     display.setTextSize(1);
+    matrix.print(10000, DEC);
+    matrix.writeDisplay();
     display.display();
 
     while (digitalRead(ui.selSw));
@@ -117,6 +121,8 @@ void gaugePowerOnUI() {
         display.println(F("Press SEL to retry"));
         while (digitalRead(ui.selSw));
         powerOnStatus = gaugePowerOn();
+        matrix.print(10000, DEC);
+        matrix.writeDisplay();
         display.display();
     }
     delay(100);
@@ -124,6 +130,8 @@ void gaugePowerOnUI() {
     display.clearDisplay();
     display.setCursor(0,0);
     display.println(F("Gauge\ninit\ncomplete"));
+    matrix.print(10000, DEC);
+    matrix.writeDisplay();
     display.display();
     display.setTextSize(1);
     delay(1000);
@@ -138,19 +146,22 @@ int readGauge() {
     if (!checkGaugeID()) {
         gaugePowerOff();
         digitalWrite(output.relay, HIGH);
+        digitalWrite(ui.interlockLED, LOW);
         display.clearDisplay();
         display.setCursor(0,0);
         display.setTextSize(2);
         display.println(F("GAUGE ERR\n"));
         display.println(F("Press SEL to reset"));
         display.setTextSize(1);
+        matrix.print(10000, DEC);
+        matrix.writeDisplay();
         display.display();
         while (digitalRead(ui.selSw));
         gaugePowerOnUI();
     }
 
     // checking high voltage
-    if (analogRead(gauge.status) > 500) hvstatus = true;
+    if (analogRead(gauge.status) > 400) hvstatus = true;
     else hvstatus = false;
 
     // sampling and returning
@@ -164,13 +175,15 @@ void displayInfo() {
     display.setCursor(0,0);
     //display.println(F("CCPG-L2-6"));
     display.print(F("ILK(mbar):"));
-    char threshStr[7];
+    char threshStr[8];
     dtostre(INTERLOCK_THRESHOLD_PRESSURE, threshStr, 1, 0);
     display.println(threshStr);
     display.print(F("PWR: "));
     display.println(poweren);
     display.print(F("HV: "));
     display.println(hvstatus);
+    matrix.print(10000, DEC);
+    matrix.writeDisplay();
     display.display();
     while (!digitalRead(ui.nxtSw));
     delay(2000);
@@ -211,6 +224,11 @@ void setup() {
         delay(500);
     }
 
+    matrix.begin(0x70);
+    matrix.setBrightness(2);
+    matrix.print(10000, DEC);
+    matrix.writeDisplay();
+
     display.clearDisplay();
     display.setCursor(0,0);
     display.setTextSize(2);
@@ -222,6 +240,7 @@ void setup() {
     display.setTextSize(1);
 
     Serial.println(F("Init complete"));
+
 
     delay(5000);
 
@@ -236,20 +255,27 @@ void loop() {
 
     float signalVoltage = readGauge();
 
-    Serial.println(signalVoltage * 5.0 / 1023);
-
     float pressure_units = transform(signalVoltage, selUnits); // in user-selected units
     float pressure_mbar = transform(signalVoltage, 0);
 
+    int   pressure_units_exponent = (int)log10(fabs(pressure_units))-1;
+    float pressure_units_mantissa = pressure_units / pow(10, pressure_units_exponent);
+
+    matrix.printFloat(pressure_units_mantissa, 3, 10);
+    matrix.writeDisplay();
+
+
     display.clearDisplay();
     display.setCursor(1,1);
-    display.setTextSize(3);
-    char pressureUnitsStr[7];
-    dtostre(pressure_units, pressureUnitsStr, 1, 0);
-    display.print(pressureUnitsStr);
-    display.setCursor(30,30);
+    display.setTextSize(4);
+    display.print("E");
+    display.setCursor(40, 1);
+    display.print(pressure_units_exponent);
+    display.setCursor(60,40);
 
     // Serial.println(pressureUnitsStr);
+
+    display.setTextSize(2);
 
     switch(selUnits) {
         case 0: // mbar
