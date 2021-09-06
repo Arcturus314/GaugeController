@@ -11,8 +11,9 @@
 #include "Adafruit_LEDBackpack.h"
 #include "math.h"
 
-#define INTERLOCK_THRESHOLD_PRESSURE 1e-6 // interlock HIGH above this threshold (mbar)
-#define GAUGE_ID_RESISTANCE 1e5
+#define INTERLOCK_THRESHOLD_PRESSURE 1e-6 // interlock LOW below this threshold (mbar)
+#define INTERLOCK_THRESHOLD_PRESSURE_HYST 1.2e-6 // interlock HIGH above this threshold (mbar)
+#define GAUGE_ID_RESISTANCE 85e3
 #define ALLOWED_ID_VARIANCE 10 // ADC increments, so steps of 5mV
 
 
@@ -33,23 +34,27 @@ float transform(float involtage, int units) {
     //  2: Pa
 
     // TODO: calibrate to true resistor values
-    float trueVoltage = involtage/1023.0 * 16.6667; // 10 bit ADC so only 1000 input steps
+    float trueVoltage = involtage/1023.0 * 21.47 * 1.014; // 10 bit ADC so only 1000 input steps
+    Serial.println("voltage");
+    Serial.println(trueVoltage);
 
     float unitCoeff = 0;
 
     switch(units) {
         case 0: // mbar
-            unitCoeff = 12.66;
+            unitCoeff = 11.33;
             break;
         case 1: // torr
-            unitCoeff = 12.826;
+            unitCoeff = 11.46;
             break;
         case 2: // Pa
-            unitCoeff = 10;
+            unitCoeff = 9.333;
             break;
     }
 
-    float pressure = pow(10, 0.75*(trueVoltage - unitCoeff));
+    float pressure = pow(10, 1.667*trueVoltage - unitCoeff);
+    Serial.println("pressure");
+    Serial.println(pressure);
     return pressure;
 }
 
@@ -291,12 +296,12 @@ void loop() {
     display.display();
     display.setTextSize(1);
 
-    if (pressure_mbar > INTERLOCK_THRESHOLD_PRESSURE && poweren == true) { // Exceeded threshold
+    if (pressure_mbar > INTERLOCK_THRESHOLD_PRESSURE_HYST && poweren == true) { // Exceeded threshold
         digitalWrite(output.relay, HIGH); // turning off interlock
         digitalWrite(ui.interlockLED, LOW); // front panel notification LED
     }
 
-    else { // normal safe conditions
+    else if (pressure_mbar < INTERLOCK_THRESHOLD_PRESSURE) { // normal safe conditions
         digitalWrite(output.relay, LOW); // turning on interlock
         digitalWrite(ui.interlockLED, HIGH); // front panel notification LED
     }
