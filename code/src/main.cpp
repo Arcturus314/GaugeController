@@ -11,10 +11,10 @@
 #include "Adafruit_LEDBackpack.h"
 #include "math.h"
 
-#define INTERLOCK_THRESHOLD_PRESSURE 1e-6 // interlock LOW below this threshold (mbar)
-#define INTERLOCK_THRESHOLD_PRESSURE_HYST 1.2e-6 // interlock HIGH above this threshold (mbar)
+#define INTERLOCK_THRESHOLD_PRESSURE 1e-5 // interlock LOW below this threshold (mbar)
+#define INTERLOCK_THRESHOLD_PRESSURE_HYST 1.2e-5 // interlock HIGH above this threshold (mbar)
 #define GAUGE_ID_RESISTANCE 85e3
-#define ALLOWED_ID_VARIANCE 10 // ADC increments, so steps of 5mV
+#define ALLOWED_ID_VARIANCE 100 // ADC increments, so steps of 5mV
 
 
 Adafruit_SSD1306 display(128, 64, &Wire);
@@ -63,6 +63,8 @@ bool checkGaugeID() {
 
     int expectedVoltage = (int) ( (float) GAUGE_ID_RESISTANCE / ( (float) GAUGE_ID_RESISTANCE + 1e5) * 1024 );
     int measuredVoltage = analogRead(gauge.id);
+    Serial.println("check ID voltage");
+    Serial.println(measuredVoltage);
 
     if ( abs(expectedVoltage - measuredVoltage) > ALLOWED_ID_VARIANCE ) return false;
 
