@@ -268,7 +268,30 @@ void loop() {
     int   pressure_units_exponent = (int)log10(fabs(pressure_units))-1;
     float pressure_units_mantissa = pressure_units / pow(10, pressure_units_exponent);
 
+
     matrix.printFloat(pressure_units_mantissa, 3, 10);
+
+    if (pressure_units_exponent > -1) matrix.writeDigitRaw(3, 0x73);
+    else matrix.writeDigitRaw(3, 0x40);
+
+    switch (pressure_units_exponent) {
+        case -9: matrix.writeDigitRaw(4,0x6F); break;
+        case -8: matrix.writeDigitRaw(4,0x7F); break;
+        case -7: matrix.writeDigitRaw(4,0x07); break;
+        case -6: matrix.writeDigitRaw(4,0x7D); break;
+        case -5: matrix.writeDigitRaw(4,0x6D); break;
+        case -4: matrix.writeDigitRaw(4,0x66); break;
+        case -3: matrix.writeDigitRaw(4,0x4F); break;
+        case -2: matrix.writeDigitRaw(4,0x5B); break;
+        case -1: matrix.writeDigitRaw(4,0x06); break;
+        case 0:  matrix.writeDigitRaw(4,0x3F); break;
+        case 1:  matrix.writeDigitRaw(4,0x06); break;
+        case 2:  matrix.writeDigitRaw(4,0x5B); break;
+        case 3:  matrix.writeDigitRaw(4,0x4F); break;
+        default: matrix.writeDigitRaw(4,0x79); break;
+    }
+
+
     matrix.writeDisplay();
 
 
